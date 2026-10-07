@@ -1,0 +1,16 @@
+id = "skelz0r.space-agents"
+name = "Space Agents"
+version = "0.1.0"
+min_herdr_version = "0.9.3"
+description = "Show only the current space's agents, plus blocked agents from other spaces"
+platforms = ["linux", "macos"]
+
+[[startup]]
+command = ["perl", "bin/space-agents", "restore"]
+
+[[actions]]
+id = "toggle"
+title = "Toggle space agents filter"
+description = "Switch the Agents list between the current space and all spaces"
+contexts = ["global"]
+command = ["perl", "bin/space-agents", "toggle"]

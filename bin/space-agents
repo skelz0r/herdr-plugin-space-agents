@@ -1,0 +1,54 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use IO::Socket::UNIX;
+
+my $source = "plugin:$ENV{HERDR_PLUGIN_ID}";
+my $state_file = "$ENV{HERDR_PLUGIN_STATE_DIR}/mode";
+
+my $filter = '{"op":"any","filters":['
+  . '{"op":"eq","field":"workspace_id","value":{"context":"current_workspace_id"}},'
+  . '{"op":"eq","field":"status","value":"blocked"}]}';
+
+sub request {
+  my ($method, $params) = @_;
+  my $socket = IO::Socket::UNIX->new(Peer => $ENV{HERDR_SOCKET_PATH})
+    or die "cannot connect to $ENV{HERDR_SOCKET_PATH}: $!\n";
+  print $socket qq({"id":"space-agents","method":"$method","params":$params}\n);
+  my $response = <$socket> // '';
+  die "$method failed: $response" unless $response =~ /"result"/;
+  print $response;
+}
+
+sub read_mode {
+  open(my $fh, '<', $state_file) or return 'space';
+  my $mode = <$fh> // 'space';
+  chomp $mode;
+  return $mode;
+}
+
+sub write_mode {
+  my ($mode) = @_;
+  open(my $fh, '>', $state_file) or die "cannot write $state_file: $!\n";
+  print $fh "$mode\n";
+}
+
+sub apply {
+  my ($mode) = @_;
+  if ($mode eq 'all') {
+    request('agent.view.clear', qq({"source":"$source"}));
+  } else {
+    request('agent.view.set', qq({"source":"$source","label":"space","filter":$filter}));
+  }
+}
+
+my $command = shift // '';
+if ($command eq 'restore') {
+  apply(read_mode());
+} elsif ($command eq 'toggle') {
+  my $mode = read_mode() eq 'all' ? 'space' : 'all';
+  apply($mode);
+  write_mode($mode);
+} else {
+  die "usage: space-agents restore|toggle\n";
+}
